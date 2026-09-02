@@ -62,6 +62,77 @@ def api_data():
     return resp
 
 
+# ---------------------------------------------------------------------------
+# Slim launch feed for other Slippy Labs sites (calendar.slippylabs.com).
+#
+# /api/data is ~250 KB and grows: it carries descriptions, imagery, stream
+# lists and full provider statistics. A calendar needs a name and a date. This
+# is the same data, reduced to what a date grid can actually draw, and it is
+# built from the SAME cached payload -- it costs nothing against the shared
+# 15-requests/hour upstream budget.
+#
+# CORS is open (`*`) on purpose and is safe here: the response is public,
+# read-only, and carries no credentials or per-visitor state. It is set from
+# Flask rather than nginx so it travels with the route through proxy_pass.
+# ---------------------------------------------------------------------------
+
+# LL2 publishes how precisely a T-0 is known. Anything coarser than the hour is
+# an estimate that can move by days, and the dashboard labels those "Date
+# unconfirmed" rather than drawing them as settled. A calendar has to make the
+# same distinction or it will assert a launch time that nobody has committed
+# to: confirmed launches get a clock, estimated ones get the whole day.
+# These are LL2's own abbreviations, and they match the `exact: true` rows of
+# the PRECISION table the dashboard front-end uses (www/assets/app.js) -- the
+# two must agree, or the same launch would read as confirmed in one place and
+# an estimate in the other. Note the feed also emits M, Q3, Q4 and friends,
+# which correctly fall through as estimates.
+CONFIRMED_PRECISIONS = {"SEC", "MIN", "HR"}
+
+CALENDAR_SITE_URL = "https://mission.slippylabs.com/#launches"
+
+
+@app.route("/api/calendar.json")
+def api_calendar():
+    payload = current_payload()
+    launches = []
+    for l in payload.get("upcoming") or []:
+        net = l.get("net")
+        if not net:
+            # Without a date there is nothing a calendar can do with it.
+            continue
+        precision = l.get("net_precision")
+        pad = l.get("pad") or {}
+        launches.append(
+            {
+                "id": l.get("id"),
+                "name": l.get("name"),
+                "provider": ((l.get("provider") or {}).get("name")),
+                "rocket": ((l.get("rocket") or {}).get("name")),
+                "pad": pad.get("name"),
+                "location": pad.get("location"),
+                "net": net,
+                "precision": precision,
+                "confirmed": precision in CONFIRMED_PRECISIONS,
+                "status": ((l.get("status") or {}).get("name")),
+                "url": CALENDAR_SITE_URL,
+            }
+        )
+
+    resp = jsonify(
+        {
+            "generated_at": payload.get("generated_at"),
+            "source": "The Space Devs - Launch Library 2",
+            "count": len(launches),
+            "launches": launches,
+        }
+    )
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    # Five minutes: the upstream feed refreshes far more slowly than that, and
+    # a calendar redrawing a month must not re-fetch a manifest each time.
+    resp.headers["Cache-Control"] = "public, max-age=300"
+    return resp
+
+
 @app.route("/api/health")
 def api_health():
     status = STORE.status()
