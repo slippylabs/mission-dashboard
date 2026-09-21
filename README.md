@@ -137,6 +137,9 @@ www/
   assets/style.css         dark-only design system
   assets/world.js          generated — pre-projected country outlines
 deploy/                    nginx vhost, systemd unit, deploy script, runbook
+  slippylabs/              the mission.slippylabs.com deployment (different unit,
+                           port and paths from the files beside it — see
+                           deploy/README.md)
 ```
 
 ## Running it

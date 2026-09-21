@@ -1,0 +1,31 @@
+[Unit]
+Description=mission.slippylabs.com launch dashboard API (Flask/gunicorn)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=missiondash
+Group=missiondash
+WorkingDirectory=/opt/mission-dashboard
+Environment=PYTHONUNBUFFERED=1
+# -w 1 is load-bearing: the Launch Library feed cache and its background
+# refresher live in process memory, so a second worker would keep its own
+# copy and independently spend the shared 15-requests/hour upstream budget.
+ExecStart=/opt/mission-dashboard/venv/bin/gunicorn \
+    --workers 1 \
+    --threads 4 \
+    --timeout 120 \
+    --bind 127.0.0.1:8024 \
+    app:app
+Restart=on-failure
+RestartSec=5
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/mission-dashboard
+
+[Install]
+WantedBy=multi-user.target

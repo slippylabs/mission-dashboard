@@ -1,5 +1,16 @@
 # Deploying mission-dashboard
 
+> **Two deployment targets, and this page describes only the first.**
+>
+> | Target | Files | Service | Port |
+> | --- | --- | --- | --- |
+> | `mission.mhpwebserver.com` (original) | this page, `deploy.sh`, `systemd/`, `nginx/` | `mission-backend.service` | 8793 |
+> | `mission.slippylabs.com` | [`deploy/slippylabs/`](slippylabs/) | `mission-dashboard.service` | 8024 |
+>
+> Nothing in `systemd/` or `nginx/` here matches the slippylabs box — different
+> unit name, port, paths and user — so do not copy them into place there.
+> `deploy.sh` is likewise written for the original target only.
+
 Upcoming launches and active crewed missions from Launch Library 2, over a
 baked SVG world map with a live day/night terminator.
 
