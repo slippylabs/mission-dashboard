@@ -4,7 +4,7 @@ A live dashboard for orbital spaceflight: what's launching next, who's off the
 planet right now, and the agencies and companies flying them — over a world map
 with a real-time day/night terminator.
 
-### → **[mission.mhpwebserver.com](https://mission.mhpwebserver.com)** — live site
+### → **[mission.slippylabs.com](https://mission.slippylabs.com)** — live site
 
 ![Launch schedule](docs/screenshots/launch-schedule.png)
 
@@ -136,10 +136,8 @@ www/
   assets/app.js            views, countdowns, map rendering, terminator
   assets/style.css         dark-only design system
   assets/world.js          generated — pre-projected country outlines
-deploy/                    nginx vhost, systemd unit, deploy script, runbook
-  slippylabs/              the mission.slippylabs.com deployment (different unit,
-                           port and paths from the files beside it — see
-                           deploy/README.md)
+deploy/README.md           runbook
+deploy/slippylabs/         the mission.slippylabs.com unit, drop-ins and vhost
 ```
 
 ## Running it
@@ -148,12 +146,11 @@ deploy/                    nginx vhost, systemd unit, deploy script, runbook
 git clone https://github.com/mattpetosa/mission-dashboard.git
 cd mission-dashboard
 python3 -m venv venv && ./venv/bin/pip install flask gunicorn requests
-./venv/bin/python app.py       # http://127.0.0.1:8793
+./venv/bin/python app.py       # http://127.0.0.1:8024
 ```
 
 Then serve `www/` on the same origin with `/api/` proxied to that port — see
-[`deploy/README.md`](deploy/README.md) for the nginx vhost, the systemd unit and
-the deploy script.
+[`deploy/README.md`](deploy/README.md) for the nginx vhost and the systemd unit.
 
 **The first few minutes are cold.** The cache starts empty and the refresher
 fills one feed per minute by design, so give it five minutes before judging it.

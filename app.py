@@ -1,5 +1,5 @@
 """
-mission.mhpwebserver.com -- backend for the launch & active-mission dashboard.
+mission.slippylabs.com -- backend for the launch & active-mission dashboard.
 
 Serves one normalised JSON document assembled from Launch Library 2 (see
 ll2.py), plus a caching image proxy. Visitors never touch the upstream API or
@@ -305,4 +305,4 @@ warm_images()
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=8793, debug=False)
+    app.run(host="127.0.0.1", port=8024, debug=False)

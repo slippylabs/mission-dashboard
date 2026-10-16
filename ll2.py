@@ -25,7 +25,7 @@ log = logging.getLogger("mission.ll2")
 
 API_ROOT = "https://ll.thespacedevs.com/2.3.0"
 CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache")
-USER_AGENT = "mission.mhpwebserver.com (personal launch dashboard)"
+USER_AGENT = "mission.slippylabs.com (slippylabs Mission Control; contact via https://slippylabs.com/report.html)"
 
 # Every upstream host we are willing to fetch imagery from, exact match. This is
 # the allowlist app.py's image proxy enforces (that endpoint takes a URL from the

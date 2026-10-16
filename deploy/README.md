@@ -1,49 +1,41 @@
 # Deploying mission-dashboard
 
-> **Two deployment targets, and this page describes only the first.**
->
-> | Target | Files | Service | Port |
-> | --- | --- | --- | --- |
-> | `mission.mhpwebserver.com` (original) | this page, `deploy.sh`, `systemd/`, `nginx/` | `mission-backend.service` | 8793 |
-> | `mission.slippylabs.com` | [`deploy/slippylabs/`](slippylabs/) | `mission-dashboard.service` | 8024 |
->
-> Nothing in `systemd/` or `nginx/` here matches the slippylabs box — different
-> unit name, port, paths and user — so do not copy them into place there.
-> `deploy.sh` is likewise written for the original target only.
-
 Upcoming launches and active crewed missions from Launch Library 2, over a
-baked SVG world map with a live day/night terminator.
+baked SVG world map with a live day/night terminator. Live at
+`mission.slippylabs.com`.
 
 | What | Where |
 |---|---|
-| Application | `/home/matt/mission-dashboard` |
-| Served static files | `/var/www/mission.mhpwebserver.com` (deploy target) |
-| API | gunicorn on `127.0.0.1:8793`, proxied at `/api/` |
-| Service | `mission-backend.service` |
-| Cache | `cache/` — 30MB of API responses and proxied imagery, not in git |
+| Application | `/opt/mission-dashboard` (runs as `missiondash`) |
+| Served static files | `/var/www/mission.slippylabs.com` |
+| API | gunicorn on `127.0.0.1:8024`, proxied at `/api/` |
+| Service | `mission-dashboard.service` |
+| Cache | `cache/` — API responses and proxied imagery, not in git |
 
 **No credentials.** Launch Library 2 is a public API and needs no key, so
-there is no `.env` and nothing secret to move. This is the only project here
-that can be stood up from a clone alone.
+there is no `.env` and nothing secret to move.
 
-## Standing it up
+The files the original (pre-slippylabs) deployment used — `deploy.sh`, an
+nginx vhost for another domain, `ssl-params.conf` and `mission-backend.service`
+— were removed on 2026-10-16; they targeted a different host, port and user
+and must never be copied onto this box.
+
+## Files in `deploy/slippylabs/`
+
+| Repo file | Live path |
+|---|---|
+| `mission-dashboard.service` | `/etc/systemd/system/mission-dashboard.service` |
+| `10-memory.conf`, `10-narrow-writes.conf`, `cpu-priority.conf` | `/etc/systemd/system/mission-dashboard.service.d/` |
+| `mission.slippylabs.com.conf` | `/etc/nginx/sites-available/` (symlinked into `sites-enabled/`) |
+
+## Updating
 
 ```bash
-sudo apt install -y python3-venv nginx git
-git clone <repo> /srv/mission-dashboard && cd /srv/mission-dashboard
-python3 -m venv venv && ./venv/bin/pip install flask gunicorn requests
-
-sudo cp deploy/systemd/mission-backend.service /etc/systemd/system/
-sudo cp deploy/nginx/ssl-params.conf /etc/nginx/snippets/
-sudo cp deploy/nginx/mission.mhpwebserver.com.conf /etc/nginx/sites-available/
-sudo ln -s /etc/nginx/sites-available/mission.mhpwebserver.com.conf /etc/nginx/sites-enabled/
-
-sudo systemctl daemon-reload && sudo systemctl enable --now mission-backend
-sudo nginx -t && sudo systemctl reload nginx
-./deploy/deploy.sh --static
+sudo install -o missiondash -g missiondash -m 0644 app.py ll2.py /opt/mission-dashboard/
+sudo systemctl restart mission-dashboard
+# static front end
+sudo cp -r www/. /var/www/mission.slippylabs.com/
 ```
-
-The unit hardcodes `/home/matt/mission-dashboard`; edit it before enabling.
 
 ## The rate limit shapes everything
 
