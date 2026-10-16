@@ -30,8 +30,14 @@ and must never be copied onto this box.
 
 ## Updating
 
+Code and venv are **root-owned** (since 2026-10-16); the service user
+`missiondash` owns only `cache/` and `.gunicorn/`, and the app dir itself is
+`root:missiondash 0750`, so a bug in the service cannot rewrite its own code.
+Install as root, never as missiondash. Dependencies: `requirements.txt` (pins
+urllib3 >= 2.8.0); upgrade with `sudo -H venv/bin/pip install -r requirements.txt`.
+
 ```bash
-sudo install -o missiondash -g missiondash -m 0644 app.py ll2.py /opt/mission-dashboard/
+sudo install -o root -g root -m 0644 app.py ll2.py /opt/mission-dashboard/
 sudo systemctl restart mission-dashboard
 # static front end
 sudo cp -r www/. /var/www/mission.slippylabs.com/

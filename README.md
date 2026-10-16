@@ -145,7 +145,7 @@ deploy/slippylabs/         the mission.slippylabs.com unit, drop-ins and vhost
 ```bash
 git clone https://github.com/mattpetosa/mission-dashboard.git
 cd mission-dashboard
-python3 -m venv venv && ./venv/bin/pip install flask gunicorn requests
+python3 -m venv venv && ./venv/bin/pip install -r requirements.txt   # pins urllib3 2.8.0+ (GHSA-vxq7-64xx-v4gw)
 ./venv/bin/python app.py       # http://127.0.0.1:8024
 ```
 

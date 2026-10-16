@@ -327,8 +327,8 @@ def norm_provider(p):
         "description": p.get("description"),
         "administrator": p.get("administrator"),
         "founding_year": p.get("founding_year"),
-        "info_url": p.get("info_url"),
-        "wiki_url": p.get("wiki_url"),
+        "info_url": _web_url(p.get("info_url")),
+        "wiki_url": _web_url(p.get("wiki_url")),
         "total_launch_count": p.get("total_launch_count"),
         "successful_launches": p.get("successful_launches"),
         "failed_launches": p.get("failed_launches"),
@@ -381,6 +381,25 @@ def _proxyable(url):
     except ValueError:
         return None
     if parsed.scheme != "https" or parsed.hostname not in IMAGE_HOSTS:
+        return None
+    return text
+
+
+def _web_url(value):
+    """A link target only if it is plain http(s) with a host.
+
+    These fields come from community-edited Launch Library data and end up in
+    an href; a `javascript:` (or `data:`) URL there would run in our origin
+    when clicked. Same rule norm_stream applies to stream URLs.
+    """
+    text = _clean(value)
+    if not text:
+        return None
+    try:
+        parsed = urlparse(text)
+    except ValueError:
+        return None
+    if parsed.scheme.lower() not in ("http", "https") or not parsed.hostname:
         return None
     return text
 
@@ -487,7 +506,7 @@ def norm_launch(l):
             "variant": _clean(rocket_cfg.get("variant")),
             "reusable": rocket_cfg.get("reusable"),
             "description": rocket_cfg.get("description"),
-            "wiki_url": rocket_cfg.get("wiki_url"),
+            "wiki_url": _web_url(rocket_cfg.get("wiki_url")),
             "length": rocket_cfg.get("length"),
             "leo_capacity": rocket_cfg.get("leo_capacity"),
             "total_launch_count": rocket_cfg.get("total_launch_count"),
@@ -513,10 +532,10 @@ def norm_launch(l):
             # well under one pixel on a world map.
             "location_latitude": _coord(loc.get("latitude")),
             "location_longitude": _coord(loc.get("longitude")),
-            "map_url": pad.get("map_url"),
+            "map_url": _web_url(pad.get("map_url")),
         },
         "programs": [
-            {"name": p.get("name"), "image": _img(p.get("image")), "url": p.get("info_url") or p.get("wiki_url")}
+            {"name": p.get("name"), "image": _img(p.get("image")), "url": _web_url(p.get("info_url")) or _web_url(p.get("wiki_url"))}
             for p in (l.get("program") or [])
             if isinstance(p, dict) and p.get("name")
         ],
@@ -546,7 +565,7 @@ def norm_astronaut(a):
         "category_id": (a.get("type") or {}).get("id") if isinstance(a.get("type"), dict) else None,
         "in_space_since": a.get("last_flight"),
         "time_in_space": a.get("time_in_space"),
-        "wiki": a.get("wiki"),
+        "wiki": _web_url(a.get("wiki")),
     }
 
 

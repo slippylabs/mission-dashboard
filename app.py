@@ -161,7 +161,8 @@ ALLOWED_IMAGE_HOSTS = ll2.IMAGE_HOSTS
 
 IMG_CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache", "img")
 os.makedirs(IMG_CACHE, exist_ok=True)
-IMG_MAX_BYTES = 8 * 1024 * 1024
+IMG_MAX_BYTES = 8 * 1024 * 1024          # per file
+IMG_CACHE_MAX_BYTES = 200 * 1024 * 1024  # whole image cache, LRU-evicted past this
 _img_locks = {}
 _img_locks_guard = threading.Lock()
 
@@ -189,6 +190,74 @@ def img_cache_path(url):
     return os.path.join(IMG_CACHE, hashlib.sha256(url.encode("utf-8")).hexdigest()[:32] + ext)
 
 
+def payload_images():
+    """Every proxyable image URL the current payload references.
+
+    The proxy only fetches URLs in this set: the allowlist alone still let any
+    caller make this box download (and store) arbitrary objects from those
+    CDNs. Walking the whole payload, rather than listing fields, means a new
+    image field in ll2.py can never be silently refused. Memoised per payload
+    object -- current_payload() hands back the same dict until it rebuilds.
+    """
+    body = current_payload()
+    with _img_set_guard:
+        if _img_set["body"] is body:
+            return _img_set["urls"]
+    urls = set()
+
+    def walk(v):
+        if isinstance(v, dict):
+            for x in v.values():
+                walk(x)
+        elif isinstance(v, list):
+            for x in v:
+                walk(x)
+        elif isinstance(v, str) and v.startswith("https://") and img_cache_path(v):
+            urls.add(v)
+    walk(body)
+    with _img_set_guard:
+        _img_set.update({"body": body, "urls": urls})
+    return urls
+
+
+_img_set = {"body": None, "urls": set()}
+_img_set_guard = threading.Lock()
+_evict_guard = threading.Lock()
+
+
+def evict_images():
+    """Keep the image cache under IMG_CACHE_MAX_BYTES, least recently used
+    first (api_img touches a file's mtime each time it serves it)."""
+    if not _evict_guard.acquire(blocking=False):
+        return
+    try:
+        entries = []
+        with os.scandir(IMG_CACHE) as it:
+            for e in it:
+                if e.is_file() and not e.name.endswith(".tmp"):
+                    st = e.stat()
+                    entries.append((st.st_mtime, st.st_size, e.path))
+        total = sum(sz for _, sz, _ in entries)
+        if total <= IMG_CACHE_MAX_BYTES:
+            return
+        entries.sort()
+        removed = 0
+        for _, sz, path in entries:
+            if total <= IMG_CACHE_MAX_BYTES * 0.9:
+                break
+            try:
+                os.unlink(path)
+                total -= sz
+                removed += 1
+            except OSError:
+                pass
+        log.info("image cache: evicted %d files, now %.1f MB", removed, total / 1048576)
+    except OSError as exc:
+        log.warning("image cache eviction failed: %s", exc)
+    finally:
+        _evict_guard.release()
+
+
 def fetch_image(url, path):
     """Download an image into the cache unless it is already there."""
     if os.path.exists(path):
@@ -197,8 +266,21 @@ def fetch_image(url, path):
         if os.path.exists(path):  # another thread may have won the race
             return path
         try:
-            r = requests.get(url, timeout=30, stream=True, headers={"User-Agent": ll2.USER_AGENT})
+            # No redirects: the host allowlist is checked on the URL we were
+            # given, and following a 3xx would let that host send us anywhere.
+            r = requests.get(url, timeout=30, stream=True, allow_redirects=False,
+                             headers={"User-Agent": ll2.USER_AGENT})
+            if r.is_redirect or 300 <= r.status_code < 400:
+                r.close()
+                raise ImageError(502, "upstream redirected")
             r.raise_for_status()
+            try:
+                declared = int(r.headers.get("Content-Length") or 0)
+            except ValueError:
+                declared = 0
+            if declared > IMG_MAX_BYTES:
+                r.close()
+                raise ImageError(413, "image too large")
             ctype = (r.headers.get("Content-Type") or "").split(";")[0].strip()
             if not ctype.startswith("image/"):
                 raise ImageError(415, "not an image")
@@ -213,11 +295,13 @@ def fetch_image(url, path):
                         raise ImageError(413, "image too large")
                     fh.write(chunk)
             os.replace(tmp, path)
-        except ImageError:
+        except ImageError as exc:
+            log.warning("image proxy refused %s: %s", url, exc.message)
             raise
         except Exception as exc:
             log.warning("image proxy failed for %s: %s", url, exc)
             raise ImageError(502, "upstream fetch failed")
+    evict_images()
     return path
 
 
@@ -282,10 +366,19 @@ def api_img():
     if not path:
         return jsonify({"error": "host not allowed"}), 403
 
+    # Already on disk: serving it costs no upstream fetch. Otherwise only
+    # fetch what the dashboard itself is currently showing.
+    if not os.path.exists(path):
+        if url not in payload_images():
+            return jsonify({"error": "not a current dashboard image"}), 404
+        try:
+            fetch_image(url, path)
+        except ImageError as exc:
+            return jsonify({"error": exc.message}), exc.status
     try:
-        fetch_image(url, path)
-    except ImageError as exc:
-        return jsonify({"error": exc.message}), exc.status
+        os.utime(path)  # LRU: mark as recently used
+    except OSError:
+        pass
 
     ctype = mimetypes.guess_type(path)[0] or "image/jpeg"
     resp = send_file(path, mimetype=ctype, conditional=True)
