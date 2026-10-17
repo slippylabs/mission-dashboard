@@ -1061,3 +1061,33 @@ img { max-width: 100%; display: block; }
     white-space: nowrap;
   }
 }
+
+/* ---- phone polish (2026-10-17 mobile audit) --------------------------------
+   iOS Safari zooms the whole page in when a focused field's text is under
+   16px, and does not zoom back out. Touch screens get 16px fields. */
+@media (hover: none) and (pointer: coarse) {
+  input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]):not([type=button]):not([type=submit]),
+  select, textarea { font-size: 16px; }
+}
+/* The tab strip scrolls sideways under 1150px with its scrollbar hidden, so
+   the only hint there was more was a tab cut off at the edge. Scroll shadows:
+   a cyan glow at whichever edge has more tabs past it. The two "local" covers
+   travel with the content and hide the glow once that end is reached. */
+@media (max-width: 1150px) {
+  .tabs {
+    background:
+      linear-gradient(90deg, rgb(10,15,32) 45%, rgba(10,15,32,0)) left center / 40px 100% no-repeat local,
+      linear-gradient(270deg, rgb(10,15,32) 45%, rgba(10,15,32,0)) right center / 40px 100% no-repeat local,
+      radial-gradient(farthest-side at 0 50%, rgba(155,238,255,.55), rgba(155,238,255,0)) left center / 22px 100% no-repeat scroll,
+      radial-gradient(farthest-side at 100% 50%, rgba(155,238,255,.55), rgba(155,238,255,0)) right center / 22px 100% no-repeat scroll,
+      rgb(10,15,32);
+  }
+}
+/* A landscape phone is wider than the 620/560px touch blocks above, so its
+   tabs, chips and header links were back to 33-38px. Same sizing there. */
+@media (pointer: coarse) and (max-height: 500px) {
+  .tab, .chip, .seg-btn, .brand, .home-link {
+    min-height: 44px; display: inline-flex; align-items: center; justify-content: center;
+  }
+  .seg-btn { min-width: 44px; }
+}
